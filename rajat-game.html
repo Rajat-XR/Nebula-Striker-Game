@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: url('backgroundimage.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+        }
+        canvas {
+            display: block;
+            border: 1px solid #ccc;
+        }
+        #cover {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+        }
+        #cover h1 {
+            font-size: 48px;
+            text-align: center;
+        }
+    </style>
+    <title>Shooting Game</title>
+</head>
+<body>
+    <div id="cover">
+<h1>-------------------------------------<br/>NEBULA STRIKER <br/> (Created by Rajat Studios) <br/> ------------------------------------- <br/> 🎮 Click to Play 🎮</h1>        
+</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <audio id="shootSound" src="shoot.mp3"></audio>
+    <audio id="hitSound" src="hit.mp3"></audio>
+    <audio id="gameOverSound" src="gameover.mp3"></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const cover = document.getElementById('cover');
+
+        // Set canvas dimensions
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Player object
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 60,
+            width: 40,
+            height: 60,
+            color: 'purple',
+            speed: 8,
+            lives: 3
+        };
+
+        // Bullets array
+        const bullets = [];
+
+        // Enemies array
+        const enemies = [];
+
+        // Game state
+        let score = 0;
+        let isGameOver = false;
+
+        // Highscore
+        let highscore = 0;
+
+        // Boost block
+        const boost = {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 20,
+            color: 'gold',
+            isAvailable: false
+        };
+
+        // Load sounds
+        const shootSound = document.getElementById('shootSound');
+        const hitSound = document.getElementById('hitSound');
+        const gameOverSound = document.getElementById('gameOverSound');
+
+        // Handle player input
+        function handleInput(e) {
+            if (cover.style.display !== 'none') {
+                startGame();
+            } else if (isGameOver) {
+                resetGame();
+                isGameOver = false;
+            } else {
+                if (e.key === 'ArrowLeft' && player.x > 0) {
+                    player.x -= player.speed;
+                } else if (e.key === 'ArrowRight' && player.x < canvas.width - player.width) {
+                    player.x += player.speed;
+                } else if (e.key === ' ' && !isGameOver) {
+                    shoot();
+                }
+            }
+        }
+
+        // Shoot function
+        function shoot() {
+            bullets.push({
+                x: player.x + player.width / 2 - 2.5,
+                y: player.y,
+                width: 5,
+                height: 10,
+                color: 'yellow',
+                speed: 10
+            });
+            shootSound.play();
+        }
+
+        // Spawn enemies
+        function spawnEnemy() {
+            enemies.push({
+                x: Math.random() * (canvas.width - 30),
+                y: 0,
+                width: 30,
+                height: 50,
+                color: 'red',
+                speed: Math.random() * 3 + 1 // Random speed between 1 and 4
+            });
+        }
+
+        // Update game state
+function update() {
+    if (!isGameOver) {
+        // Move enemies
+        enemies.forEach(enemy => {
+            enemy.y += enemy.speed;
+
+            // Check for collision with player
+            if (
+                player.x < enemy.x + enemy.width &&
+                player.x + player.width > enemy.x &&
+                player.y < enemy.y + enemy.height &&
+                player.y + player.height > enemy.y
+            ) {
+                // Subtract a life and reset enemy
+                player.lives--;
+                enemy.y = 0;
+                enemy.x = Math.random() * (canvas.width - 30);
+                if (player.lives === 0) {
+                    isGameOver = true;
+                    gameOverSound.play();
+                    if (score > highscore) {
+                        highscore = score;
+                    }
+                }
+            }
+
+            // Check if enemy passes the ground
+            if (enemy.y > canvas.height) {
+                enemy.y = 0;
+                enemy.x = Math.random() * (canvas.width - 30);
+                score -= 1; // Subtract 1 from the score
+            }
+        });
+
+        // Move boost block
+        if (boost.isAvailable) {
+            boost.y += 2;
+            // Check for collision with player
+            if (
+                player.x < boost.x + boost.width &&
+                player.x + player.width > boost.x &&
+                player.y < boost.y + boost.height &&
+                player.y + player.height > boost.y
+            ) {
+                // Activate boost and reset block
+                boost.isAvailable = false;
+                enemies.forEach(enemy => {
+                    // Destroy enemies on the screen
+                    if (enemy.y < canvas.height) {
+                        enemy.y = 0;
+                        enemy.x = Math.random() * (canvas.width - 30);
+                    }
+                });
+            }
+
+            // Check if boost block passes the ground
+            if (boost.y > canvas.height) {
+                boost.isAvailable = false;
+            }
+        } else {
+            // Randomly spawn boost block
+            if (Math.random() < 0.005) {
+                boost.isAvailable = true;
+                boost.x = Math.random() * (canvas.width - boost.width);
+                boost.y = 0;
+            }
+        }
+
+        // Move bullets
+        bullets.forEach((bullet, index) => {
+            bullet.y -= bullet.speed;
+            // Remove bullets that go off-screen
+            if (bullet.y < 0) {
+                bullets.splice(index, 1);
+            }
+        });
+
+        // Check for collision with bullets
+        bullets.forEach((bullet, bulletIndex) => {
+            enemies.forEach((enemy, enemyIndex) => {
+                if (
+                    bullet.x < enemy.x + enemy.width &&
+                    bullet.x + bullet.width > enemy.x &&
+                    bullet.y < enemy.y + enemy.height &&
+                    bullet.y + bullet.height > enemy.y
+                ) {
+                    // Remove bullet and enemy, increase score
+                    bullets.splice(bulletIndex, 1);
+                    enemies.splice(enemyIndex, 1);
+                    score += 10;
+                    hitSound.play();
+                }
+            });
+        });
+
+        // Spawn new enemy at random intervals
+        if (Math.random() < 0.02) {
+            spawnEnemy();
+        }
+    }
+}
+
+
+
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            });
+
+            // Draw boost block
+            if (boost.isAvailable) {
+                ctx.fillStyle = boost.color;
+                ctx.fillRect(boost.x, boost.y, boost.width, boost.height);
+            }
+
+            // Draw bullets
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+
+            // Draw score
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.fillText('Score: ' + score, 10, 30);
+
+            // Draw highscore
+            ctx.fillText('Highscore: ' + highscore, 10, 60);
+
+            // Draw lives
+            ctx.fillText('Lives: ' + player.lives, canvas.width - 100, 30);
+
+            // Draw game over message
+            if (isGameOver) {
+    ctx.fillStyle = 'green';
+    ctx.font = '48px Arial';
+    ctx.fillText('Game Over', canvas.width / 2 - 150, canvas.height / 2 - 24);
+
+    ctx.fillStyle = 'white';
+    ctx.font = '24px Arial';
+    ctx.fillText('Powered by RAJAT-STUDIOS', canvas.width / 2 - 180, canvas.height / 2 + 24);
+
+    ctx.fillText('(Click anywhere to restart)', canvas.width / 2 - 160, canvas.height / 2 + 72);
+}
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            if (!isGameOver) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', handleInput);
+        window.addEventListener('click', startGame);
+
+        // Start the game
+        function startGame() {
+            cover.style.display = 'none';
+            resetGame();
+            gameLoop();
+        }
+
+        // Reset the game state
+        function resetGame() {
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 60;
+            bullets.length = 0;
+            enemies.length = 0;
+            score = 0;
+            player.lives = 3;
+            isGameOver = false;
+        }
+    </script>
+</body>
+</html>
